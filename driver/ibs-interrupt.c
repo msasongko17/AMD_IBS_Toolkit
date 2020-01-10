@@ -20,6 +20,11 @@
 #include "ibs-msr-index.h"
 #include "ibs-interrupt.h"
 #include "ibs-structs.h"
+#include <linux/sched/signal.h>
+
+#define SIGNEW 44
+
+struct task_struct *target_process = NULL;
 
 extern void *pcpu_op_dev;
 extern void *pcpu_fetch_dev;
@@ -170,6 +175,8 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	struct ibs_op *sample;
 	u64 tmp;
 
+	struct kernel_siginfo info;
+
 	/* See do_fam10h_workaround_420() definition for details */
 	rdmsrl(MSR_IBS_OP_CTL, tmp);
 	if (dev->workaround_fam10h_err_420 && !(tmp & IBS_OP_MAX_CNT_OLD))
@@ -196,6 +203,21 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	atomic_long_set(&dev->wr, new_wr);
 	atomic_long_inc(&dev->entries);
 
+	// before
+	//unsigned int minor = iminor(inode);
+
+	memset(&info, 0, sizeof(struct kernel_siginfo));
+        info.si_signo = SIGNEW;
+        info.si_code = SI_QUEUE;
+        //dev = (struct device*) filp->private_data;
+        info.si_int = dev->cpu;
+
+        if(target_process != NULL) {
+                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
+                        printk(KERN_INFO "Unable to send signal\n");
+                }
+        }
+	// after
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	irq_work_queue(&dev->bottom_half);
 #else
@@ -257,6 +279,7 @@ static inline int handle_ibs_event(struct pt_regs *regs)
 	if (tmp & IBS_OP_VAL) {
 		handle_ibs_op_event(regs);
 		retval += NMI_HANDLED;
+		//printk(KERN_INFO "THere is a micro-op sample\n");
 	}
 
 	/* Check for fetch sample */
@@ -289,6 +312,7 @@ static inline int handle_ibs_event(struct pt_regs *regs)
 	if (tmp & IBS_OP_VAL) {
 		handle_ibs_op_event(regs);
 		retval++;
+		//printk(KERN_INFO "There is a micro-op sample\n");
 	}
 
 	/* Check for fetch sample only if no op samples were avilable.

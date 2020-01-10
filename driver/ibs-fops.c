@@ -17,6 +17,8 @@
 #include <linux/version.h>
 #include <linux/wait.h>
 #include <linux/delay.h>
+//for send_sig_info
+#include <linux/sched/signal.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,0,0)
 #include <linux/atomic.h>
@@ -51,6 +53,13 @@
 #include "ibs-uapi.h"
 #include "ibs-utils.h"
 #include "ibs-workarounds.h"
+
+#define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
+
+#define SIGNEW 44
+
+static int signum = 0;
+extern struct task_struct *target_process;
 
 /* Declarations of all the devices on a per-cpu basis.
  * Real declaration is in ibs-core.c */
@@ -163,6 +172,7 @@ int ibs_open(struct inode *inode, struct file *file)
 {
 	unsigned int minor = iminor(inode);
 	struct ibs_dev *dev;
+	//struct kernel_siginfo info;
 
 	if (IBS_FLAVOR(minor) == IBS_OP)
 		dev = per_cpu_ptr(pcpu_op_dev, IBS_CPU(minor));
@@ -178,6 +188,17 @@ int ibs_open(struct inode *inode, struct file *file)
 	set_ibs_defaults(dev);
 	reset_ibs_buffer(dev);
 	mutex_unlock(&dev->ctl_lock);
+	/*memset(&info, 0, sizeof(struct kernel_siginfo));
+        info.si_signo = SIGNEW;
+        info.si_code = SI_QUEUE;
+        //dev = (struct device*) filp->private_data;
+        info.si_int = minor;
+
+        if(target_process != NULL) {
+                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
+                        printk(KERN_INFO "Unable to send signal\n");
+                }
+        }*/
 
 	return 0;
 }
@@ -492,6 +513,10 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case RESET_BUFFER:
 		reset_ibs_buffer(dev);
+		break;
+	case REG_CURRENT_PROCESS:
+		target_process = get_current();
+                signum = SIGNEW;
 		break;
 	default:	/* Command not recognized */
 		retval = -ENOTTY;
