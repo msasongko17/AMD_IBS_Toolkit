@@ -294,14 +294,15 @@ ssize_t ibs_read(struct file *file, char __user *buf, size_t count,
 	
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
-		if (wait_event_interruptible(dev->readq,
+		/*if (wait_event_interruptible(dev->readq,
 					(atomic_long_read(&dev->rd) !=
 					atomic_long_read(&dev->wr))))
-			return -ERESTARTSYS;
+			return -ERESTARTSYS;*/
 		mutex_lock(&dev->read_lock);
 	}
 	retval = do_ibs_read(dev, buf, count);
 	mutex_unlock(&dev->read_lock);
+	// send signal from here
 	return retval;
 }
 

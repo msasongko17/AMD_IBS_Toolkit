@@ -175,7 +175,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	struct ibs_op *sample;
 	u64 tmp;
 
-	struct kernel_siginfo info;
+	//struct kernel_siginfo info;
 
 	/* See do_fam10h_workaround_420() definition for details */
 	rdmsrl(MSR_IBS_OP_CTL, tmp);
@@ -206,7 +206,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	// before
 	//unsigned int minor = iminor(inode);
 
-	memset(&info, 0, sizeof(struct kernel_siginfo));
+	/*memset(&info, 0, sizeof(struct kernel_siginfo));
         info.si_signo = SIGNEW;
         info.si_code = SI_QUEUE;
         //dev = (struct device*) filp->private_data;
@@ -216,7 +216,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
                 if(send_sig_info(SIGNEW, &info, target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
                 }
-        }
+        */}
 	// after
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	irq_work_queue(&dev->bottom_half);
