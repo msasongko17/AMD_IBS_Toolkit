@@ -43,7 +43,19 @@ static inline void wake_up_queues(struct ibs_dev *dev)
 void handle_ibs_work(struct irq_work *w)
 {
 	struct ibs_dev *dev = container_of(w, struct ibs_dev, bottom_half);
-	wake_up_queues(dev);
+	//wake_up_queues(dev);
+	// signal delivery happens here
+	struct kernel_siginfo info;
+	memset(&info, 0, sizeof(struct kernel_siginfo));
+        info.si_signo = SIGNEW;
+        info.si_code = SI_QUEUE;
+        info.si_int = dev->cpu;
+
+        if(target_process != NULL) {
+                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
+                        printk(KERN_INFO "Unable to send signal\n");
+                }
+        }
 }
 #endif
 
@@ -216,7 +228,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
                 if(send_sig_info(SIGNEW, &info, target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
                 }
-        */}
+        }*/
 	// after
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	irq_work_queue(&dev->bottom_half);
