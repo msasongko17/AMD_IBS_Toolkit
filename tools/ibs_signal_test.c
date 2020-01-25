@@ -11,6 +11,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <stdint.h>
+#include <sys/syscall.h>
 
 //#define REG_CURRENT_PROCESS 101
 
@@ -179,9 +180,9 @@ void sig_event_handler(int n, siginfo_t *info, void *unused)
 		memcpy ( sample_buffer, global_buffer + offset, sizeof(ibs_op_t) );
 		offset += i * sizeof(ibs_op_t);
 		ibs_op_t *op_data = (ibs_op_t *) sample_buffer;
-		fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid);
+		//fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid);
 		if (op_data->op_data3.reg.ibs_lin_addr_valid)
-			fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d, sampled address: %lx\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid, op_data->dc_lin_ad);
+			fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d, sampled address: %lx, ld_op: %d, st_op:%d, handled by thread %ld\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid, op_data->dc_lin_ad, op_data->op_data3.reg.ibs_ld_op, op_data->op_data3.reg.ibs_st_op, syscall(SYS_gettid));
 	}
 	free (sample_buffer);
 	// after
@@ -261,8 +262,9 @@ int main()
         	ioctl(fd[i], RESET_BUFFER);
 	long sum = 0;
 	for(i = 0; i < 100000000; i++) {
-		sum += i;
+		sum = i;
 	}
+	fprintf(stderr, "sum's address: %lx\n",(long unsigned int) &sum);
 	//while (!waitpid(cpid, &i, WNOHANG));
 
 	for (int i = 0; i < nopfds; i++) {
