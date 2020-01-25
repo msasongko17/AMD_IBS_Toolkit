@@ -179,9 +179,9 @@ void sig_event_handler(int n, siginfo_t *info, void *unused)
 		memcpy ( sample_buffer, global_buffer + offset, sizeof(ibs_op_t) );
 		offset += i * sizeof(ibs_op_t);
 		ibs_op_t *op_data = (ibs_op_t *) sample_buffer;
-		fprintf(stderr, "cpu: %d, tid: %d, pid: %d\n", op_data->cpu, op_data->tid, op_data->pid);
+		fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid);
 		if (op_data->op_data3.reg.ibs_lin_addr_valid)
-        		fprintf(stderr, "sampled address: %lx\n", op_data->dc_lin_ad);
+			fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d, sampled address: %lx\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid, op_data->dc_lin_ad);
 	}
 	free (sample_buffer);
 	// after
