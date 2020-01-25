@@ -7,22 +7,196 @@
 #include <unistd.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/sysinfo.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <stdint.h>
 
-#define REG_CURRENT_PROCESS 101
+//#define REG_CURRENT_PROCESS 101
 
 #define SIGNEW 44
+#define SET_BUFFER_SIZE 0xEU
+#define BUFFER_SIZE_B   (1 << 20)
+#define SET_MAX_CNT     0x6U
+#define OP_MAX_CNT  0x4000
+#define IBS_ENABLE      0x0U
+#define IBS_DISABLE     0x1U
+#define RESET_BUFFER    0x10U
+#define GET_LOST        0xEEU
+
+#define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
+#define ASSIGN_FD 102
+
+int n_op_samples;
+int n_lost_op_samples;
 
 int8_t write_buf[1024];
 int8_t read_buf[1024];
 
+int op_cnt_max_to_set = 0;
+int buffer_size = 0;
+char *global_buffer = NULL;
+
+/* The following unions can be used to pull out specific values from inside of
+   an IBS sample. */
+typedef union {
+    uint64_t val;
+    struct {
+        uint16_t ibs_op_max_cnt     : 16;
+        uint16_t reserved_1          : 1;
+        uint16_t ibs_op_en           : 1;
+        uint16_t ibs_op_val          : 1;
+        uint16_t ibs_op_cnt_ctl      : 1;
+        uint16_t ibs_op_max_cnt_upper: 7;
+        uint16_t reserved_2          : 5;
+        uint32_t ibs_op_cur_cnt     : 27;
+        uint32_t reserved_3          : 5;
+    } reg;
+} ibs_op_ctl_t;
+
+typedef union {
+    uint64_t val;
+    struct {
+        uint16_t ibs_comp_to_ret_ctr;
+        uint16_t ibs_tag_to_ret_ctr;
+        uint8_t ibs_op_brn_resync   : 1; /* Fam. 10h, LN, BD only */
+        uint8_t ibs_op_misp_return  : 1; /* Fam. 10h, LN, BD only */
+        uint8_t ibs_op_return       : 1;
+        uint8_t ibs_op_brn_taken    : 1;
+        uint8_t ibs_op_brn_misp     : 1;
+        uint8_t ibs_op_brn_ret      : 1;
+        uint8_t ibs_rip_invalid     : 1;
+        uint8_t ibs_op_brn_fuse     : 1; /* KV+, BT+ */
+        uint8_t ibs_op_microcode    : 1; /* KV+, BT+ */
+        uint32_t reserved           : 23;
+    } reg;
+} ibs_op_data1_t;
+
+typedef union {
+    uint64_t val;
+    struct {
+        uint8_t  ibs_nb_req_src          : 3;
+        uint8_t  reserved_1              : 1;
+        uint8_t  ibs_nb_req_dst_node     : 1; /* Not valid in BT, JG */
+        uint8_t  ibs_nb_req_cache_hit_st : 1; /* Not valid in BT, JG */
+        uint64_t reserved_2              : 58;
+    } reg;
+} ibs_op_data2_t;
+
+typedef union {
+    uint64_t val;
+    struct {
+        uint8_t ibs_ld_op                    : 1;
+        uint8_t ibs_st_op                    : 1;
+        uint8_t ibs_dc_l1_tlb_miss           : 1;
+        uint8_t ibs_dc_l2_tlb_miss           : 1;
+        uint8_t ibs_dc_l1_tlb_hit_2m         : 1;
+        uint8_t ibs_dc_l1_tlb_hit_1g         : 1;
+        uint8_t ibs_dc_l2_tlb_hit_2m         : 1;
+        uint8_t ibs_dc_miss                  : 1;
+        uint8_t ibs_dc_miss_acc              : 1;
+        uint8_t ibs_dc_ld_bank_con           : 1; /* Fam. 10h, LN, BD only */
+        uint8_t ibs_dc_st_bank_con           : 1; /* Fam. 10h, LN only */
+        uint8_t ibs_dc_st_to_ld_fwd          : 1; /* Fam. 10h, LN, BD, BT+ */
+        uint8_t ibs_dc_st_to_ld_can          : 1; /* Fam. 10h, LN, BD only */
+        uint8_t ibs_dc_wc_mem_acc            : 1;
+        uint8_t ibs_dc_uc_mem_acc            : 1;
+        uint8_t ibs_dc_locked_op             : 1;
+        uint16_t ibs_dc_no_mab_alloc         : 1; /* Fam. 10h-TN:
+                                                    IBS DC MAB hit */
+        uint16_t ibs_lin_addr_valid          : 1;
+        uint16_t ibs_phy_addr_valid          : 1;
+        uint16_t ibs_dc_l2_tlb_hit_1g        : 1;
+        uint16_t ibs_l2_miss                 : 1; /* KV+, BT+ */
+        uint16_t ibs_sw_pf                   : 1; /* KV+, BT+ */
+        uint16_t ibs_op_mem_width            : 4; /* KV+, BT+ */
+        uint16_t ibs_op_dc_miss_open_mem_reqs: 6; /* KV+, BT+ */
+        uint16_t ibs_dc_miss_lat;
+        uint16_t ibs_tlb_refill_lat; /* KV+, BT+ */
+    } reg;
+} ibs_op_data3_t;
+
+typedef union {
+    uint64_t val;
+    struct {
+        uint8_t ibs_op_ld_resync: 1;
+        uint64_t reserved       : 63;
+    } reg;
+} ibs_op_data4_t; /* CZ, ST only */
+
+typedef union {
+    uint64_t val;
+    struct {
+        uint64_t ibs_dc_phys_addr   : 48;
+        uint64_t reserved           : 16;
+    } reg;
+} ibs_op_dc_phys_addr_t;
+
+
+typedef struct ibs_op {
+	ibs_op_ctl_t            op_ctl;
+	uint64_t                op_rip;
+	ibs_op_data1_t          op_data;
+	ibs_op_data2_t          op_data2;
+	ibs_op_data3_t          op_data3;
+	ibs_op_data4_t          op_data4;
+	uint64_t                dc_lin_ad;
+	ibs_op_dc_phys_addr_t   dc_phys_ad;
+	uint64_t                br_target;
+	uint64_t                tsc;
+	uint64_t                cr3;
+	int                     tid;
+	int                     pid;
+	int                     cpu;
+	int                     kern_mode;
+} ibs_op_t;
+
 void sig_event_handler(int n, siginfo_t *info, void *unused)
+{
+    int fd;
+    if (n == SIGNEW) {
+        fd = info->si_int;
+        //printf ("Received signal from kernel : Value =  %u\n", check);
+        //read(check, read_buf, 1024);
+        //printf("signal %d from file with fd %d\n", n, fd);
+	ioctl(fd, IBS_DISABLE);
+	// before
+	int tmp = 0;
+	int num_items = 0;
+
+	tmp = read(fd, global_buffer, buffer_size);
+	if (tmp <= 0) {
+		ioctl(fd, IBS_ENABLE);
+		return;
+	}
+	num_items = tmp / sizeof(ibs_op_t);
+	n_op_samples += num_items;
+	n_lost_op_samples += ioctl(fd, GET_LOST);
+	char * sample_buffer = malloc (sizeof(ibs_op_t));
+	int offset = 0;
+	for (int i = 0; i < num_items; i++) {
+		//fread((char *)&op, sizeof(op), 1, op_in_fp)
+		memcpy ( sample_buffer, global_buffer + offset, sizeof(ibs_op_t) );
+		offset += i * sizeof(ibs_op_t);
+		ibs_op_t *op_data = (ibs_op_t *) sample_buffer;
+		fprintf(stderr, "cpu: %d, tid: %d, pid: %d\n", op_data->cpu, op_data->tid, op_data->pid);
+		if (op_data->op_data3.reg.ibs_lin_addr_valid)
+        		fprintf(stderr, "sampled address: %lx\n", op_data->dc_lin_ad);
+	}
+	free (sample_buffer);
+	// after
+	ioctl(fd, IBS_ENABLE);
+    }
+}
+
+/*void sig_event_handler(int n, siginfo_t *info, void *unused)
 {
     int check;
     if (n == SIGNEW) {
         check = info->si_int;
         printf ("Received signal from kernel : from device with fd =  %u\n", check);
     }
-}
+}*/
 
 int main()
 {
@@ -30,9 +204,24 @@ int main()
 
 	int num_cpus = get_nprocs_conf();
 	int num_online_cpus = get_nprocs();
-	
-	pid_t cpid;
+	int nopfds = 0;
 
+	pid_t cpid;
+	int cpu;
+	int * fd = calloc(num_cpus, sizeof(int));
+	buffer_size = BUFFER_SIZE_B;
+	op_cnt_max_to_set = 10000;//OP_MAX_CNT;
+	int i;
+
+	struct sigaction act;
+        sigemptyset(&act.sa_mask);
+        act.sa_flags = (SA_SIGINFO | SA_RESTART);
+        act.sa_sigaction = sig_event_handler;
+        sigaction(SIGNEW, &act, NULL);
+
+	n_op_samples = 0;
+	n_lost_op_samples = 0;
+	global_buffer = malloc(buffer_size);
 	for (cpu = 0; cpu < num_cpus; cpu++) {
 		sprintf(filename, "/dev/cpu/%d/ibs/op", cpu);
 		fd[cpu] = open(filename, O_RDONLY | O_NONBLOCK);
@@ -49,10 +238,18 @@ int main()
                 	fprintf(stderr, "IBS op enable failed on cpu %d\n", cpu);
                 	continue;
             	}
-
+		if (ioctl(fd[cpu], REG_CURRENT_PROCESS)) {
+                        fprintf(stderr, "REG_CURRENT_PROCESS failed on cpu %d\n", cpu);
+                        continue;
+                }
+		if (ioctl(fd[cpu], ASSIGN_FD, fd[cpu])) {
+                        fprintf(stderr, "ASSIGN_FD failed on cpu %d\n", cpu);
+                        continue;
+                }
             	//fds[count].events = POLLIN | POLLRDNORM;
             	nopfds++;
 	}
+
 	// fork child here
 	/*cpid = fork();
         if (cpid == -1) {
@@ -62,14 +259,22 @@ int main()
 
 	for (int i = 0; i < nopfds; i++)
         	ioctl(fd[i], RESET_BUFFER);
-
-	while (!waitpid(cpid, &i, WNOHANG));
+	long sum = 0;
+	for(i = 0; i < 100000000; i++) {
+		sum += i;
+	}
+	//while (!waitpid(cpid, &i, WNOHANG));
 
 	for (int i = 0; i < nopfds; i++) {
         	ioctl(fd[i], IBS_DISABLE);
         	close(fd[i]);
     	}
 
+	free(fd);
+	fprintf(stderr, "no problem until this point, nopfds: %d, sum: %ld\n", nopfds, sum);
+	fprintf(stderr, "n_op_samples: %d\n", n_op_samples);
+	fprintf(stderr, "n_lost_op_samples: %d\n", n_lost_op_samples);
+	return 0;
 	// print results here
 
 	/*int fd[4];

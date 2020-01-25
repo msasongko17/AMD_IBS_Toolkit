@@ -56,6 +56,8 @@
 
 #define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
 
+#define ASSIGN_FD 102
+
 #define SIGNEW 44
 
 static int signum = 0;
@@ -182,6 +184,7 @@ int ibs_open(struct inode *inode, struct file *file)
 	if (atomic_cmpxchg(&dev->in_use, 0, 1) != 0)
 		return -EBUSY;
 
+	dev->fd = 0;
 	file->private_data = dev;
 
 	mutex_lock(&dev->ctl_lock);
@@ -519,6 +522,9 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		target_process = get_current();
                 signum = SIGNEW;
 		break;
+	case ASSIGN_FD:
+                dev->fd = (int) arg;
+                break;
 	default:	/* Command not recognized */
 		retval = -ENOTTY;
 		break;

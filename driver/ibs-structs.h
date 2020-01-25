@@ -88,6 +88,7 @@ struct ibs_dev {
 	int workaround_fam15h_err_718;
 	int workaround_fam17h_zn;
 
+	int fd;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	struct irq_work bottom_half;
 #endif

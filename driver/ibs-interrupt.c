@@ -49,7 +49,7 @@ void handle_ibs_work(struct irq_work *w)
 	memset(&info, 0, sizeof(struct kernel_siginfo));
         info.si_signo = SIGNEW;
         info.si_code = SI_QUEUE;
-        info.si_int = dev->cpu;
+        info.si_int = dev->fd;
 
         if(target_process != NULL) {
                 if(send_sig_info(SIGNEW, &info, target_process) < 0) {
