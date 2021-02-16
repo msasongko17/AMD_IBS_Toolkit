@@ -289,7 +289,8 @@ void start_fam17h_zn_static_workaround(const int cpu)
 	{
 		if (cpu_to_offline != cpu)
 		{
-			cpu_down(cpu_to_offline);
+			//cpu_down(cpu_to_offline);
+			remove_cpu(cpu_to_offline);
 			cpu_to_online = cpu_to_offline;
 		}
 	}
@@ -297,7 +298,8 @@ void start_fam17h_zn_static_workaround(const int cpu)
 	 * the driver, or if that core comes up after we enable the driver. */
 	custom_wrmsrl_on_cpu(cpu, FAM17H_MSR_WA_2, (cur | FAM17H_MSR_WA_2_BITS));
 	if (cpu_to_online != -1)
-		cpu_up(cpu_to_online);
+		//cpu_up(cpu_to_online);
+		add_cpu(cpu_to_online);
 }
 
 void stop_fam17h_zn_static_workaround(const int cpu)
