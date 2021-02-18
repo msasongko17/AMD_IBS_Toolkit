@@ -92,8 +92,8 @@ struct ibs_dev {
 	int fd;
 	struct task_struct *target_process;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	//struct irq_work bottom_half;
-	struct tasklet_struct bottom_half;
+	struct irq_work bottom_half;
+	//struct tasklet_struct bottom_half;
 #endif
 };
 

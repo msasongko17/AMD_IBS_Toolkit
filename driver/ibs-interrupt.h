@@ -19,8 +19,8 @@
 #include <linux/irq_work.h>
 /* If possible, we want to wake up clients that are poll()ing on reads in
  * a bottom-half work queue. That's what this does. */
-//void handle_ibs_work(struct irq_work *w);
-void handle_ibs_work(long unsigned int w);
+void handle_ibs_work(struct irq_work *w);
+//void handle_ibs_work(long unsigned int w);
 #endif
 
 /* This is the actual interrupt handler, safe for running in NMI context,
