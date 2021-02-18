@@ -519,7 +519,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		reset_ibs_buffer(dev);
 		break;
 	case REG_CURRENT_PROCESS:
-		target_process = get_current();
+		dev->target_process = get_current();
                 signum = SIGNEW;
 		break;
 	case ASSIGN_FD:

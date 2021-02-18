@@ -40,19 +40,20 @@ static inline void wake_up_queues(struct ibs_dev *dev)
 }
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-void handle_ibs_work(struct irq_work *w)
+//void handle_ibs_work(struct irq_work *w)
+//void handle_ibs_work(struct tasklet_struct *w)
+void handle_ibs_work(long unsigned int w)
 {
-	struct ibs_dev *dev = container_of(w, struct ibs_dev, bottom_half);
-	//wake_up_queues(dev);
-	// signal delivery happens here
-	struct kernel_siginfo info;
-	memset(&info, 0, sizeof(struct kernel_siginfo));
-        info.si_signo = SIGNEW;
-        info.si_code = SI_QUEUE;
-        info.si_int = dev->fd;
+	struct ibs_dev *dev = container_of((struct tasklet_struct *) w, struct ibs_dev, bottom_half);
 
-        if(target_process != NULL) {
-                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
+        if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0) {
+		struct kernel_siginfo info;
+        	memset(&info, 0, sizeof(struct kernel_siginfo));
+        	info.si_signo = SIGNEW;
+        	info.si_code = SI_QUEUE;
+        	info.si_int = dev->fd;
+		printk(KERN_INFO "interrupt happens in thread %d or %d and handled by tasklet, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
+                if(send_sig_info(SIGNEW, &info, dev->target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
                 }
         }
@@ -230,8 +231,11 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
                 }
         }*/
 	// after
+	//here
+	//printk(KERN_INFO "interrupt1 happens in thread %d or %d, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	irq_work_queue(&dev->bottom_half);
+	//irq_work_queue(&dev->bottom_half);
+	tasklet_schedule(&dev->bottom_half);
 #else
 	/* Add more work directly into the NMI handler, but in older kernels, we
 	 * didn't have access to IRQ work queues. */
@@ -269,7 +273,8 @@ static inline void handle_ibs_fetch_event(struct pt_regs *regs)
 	atomic_long_inc(&dev->entries);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	irq_work_queue(&dev->bottom_half);
+	//irq_work_queue(&dev->bottom_half);
+	tasklet_schedule(&dev->bottom_half);
 #else
 	/* Add more work directly into the NMI handler, but in older kernels, we
 	 * didn't have access to IRQ work queues. */

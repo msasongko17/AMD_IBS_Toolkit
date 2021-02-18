@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/sched.h>
 #include <linux/version.h>
+#include <linux/interrupt.h>
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,24)
 #include <linux/kdebug.h>
 #else
@@ -121,10 +122,11 @@ static void init_ibs_dev(struct ibs_dev *dev, int cpu)
 	atomic_set(&dev->in_use, 0);
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	init_irq_work(&dev->bottom_half, &handle_ibs_work);
+	//init_irq_work(&dev->bottom_half, &handle_ibs_work);
+	tasklet_init(&dev->bottom_half, handle_ibs_work, (unsigned long) &dev->bottom_half);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3,9,0)
 	//dev->bottom_half.flags = IRQ_WORK_LAZY;
-	atomic_set(&dev->bottom_half.flags, IRQ_WORK_LAZY);
+	//atomic_set(&dev->bottom_half.flags, IRQ_WORK_LAZY);
 #endif
 #endif
 	dev->ibs_fetch_supported = ibs_fetch_supported;

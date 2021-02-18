@@ -16,6 +16,7 @@
 #include <linux/types.h>
 #include <linux/version.h>
 #include <linux/wait.h>
+#include <linux/interrupt.h>
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 #include <linux/irq_work.h>
@@ -89,8 +90,10 @@ struct ibs_dev {
 	int workaround_fam17h_zn;
 
 	int fd;
+	struct task_struct *target_process;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	struct irq_work bottom_half;
+	//struct irq_work bottom_half;
+	struct tasklet_struct bottom_half;
 #endif
 };
 
