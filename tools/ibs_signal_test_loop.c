@@ -18,7 +18,7 @@
 
 #define SIGNEW 44
 #define SET_BUFFER_SIZE 0xEU
-#define BUFFER_SIZE_B   (1 << 20)
+#define BUFFER_SIZE_B   (1 << 10)
 #define SET_MAX_CNT     0x6U
 #define OP_MAX_CNT  0x4000
 #define IBS_ENABLE      0x0U
@@ -29,18 +29,20 @@
 #define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
 #define ASSIGN_FD 102
 
-int n_op_samples;
-int n_lost_op_samples;
+int n_op_samples[1024];
+int n_lost_op_samples[1024];
 
 int8_t write_buf[1024];
 int8_t read_buf[1024];
 
 int op_cnt_max_to_set = 0;
 int buffer_size = 0;
-char *global_buffer = NULL;
+char *global_buffer[1024] = {NULL};
 
 int arr[100000];
 
+int thread_count = 0;
+__thread int my_id = -1;
 /* The following unions can be used to pull out specific values from inside of
    an IBS sample. */
 typedef union {
@@ -158,7 +160,7 @@ typedef struct ibs_op {
 void sig_event_handler(int n, siginfo_t *info, void *unused)
 {
     int fd;
-    if (n == SIGNEW) {
+    if (n == SIGNEW && my_id >= 0) {
         fd = info->si_int;
         //printf ("Received signal from kernel : Value =  %u\n", check);
         //read(check, read_buf, 1024);
@@ -168,19 +170,19 @@ void sig_event_handler(int n, siginfo_t *info, void *unused)
 	int tmp = 0;
 	int num_items = 0;
 
-	tmp = read(fd, global_buffer, buffer_size);
+	tmp = read(fd, global_buffer[my_id], buffer_size);
 	if (tmp <= 0) {
 		ioctl(fd, IBS_ENABLE);
 		return;
 	}
 	num_items = tmp / sizeof(ibs_op_t);
-	n_op_samples += num_items;
-	n_lost_op_samples += ioctl(fd, GET_LOST);
+	n_op_samples[my_id] += num_items;
+	n_lost_op_samples[my_id] += ioctl(fd, GET_LOST);
 	char * sample_buffer = malloc (sizeof(ibs_op_t));
 	int offset = 0;
 	for (int i = 0; i < num_items; i++) {
 		//fread((char *)&op, sizeof(op), 1, op_in_fp)
-		memcpy ( sample_buffer, global_buffer + offset, sizeof(ibs_op_t) );
+		memcpy ( sample_buffer, global_buffer[my_id] + offset, sizeof(ibs_op_t) );
 		offset += i * sizeof(ibs_op_t);
 		ibs_op_t *op_data = (ibs_op_t *) sample_buffer;
 		//fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid);
@@ -223,9 +225,8 @@ int main()
         act.sa_sigaction = sig_event_handler;
         sigaction(SIGNEW, &act, NULL);
 
-	n_op_samples = 0;
-	n_lost_op_samples = 0;
-	global_buffer = malloc(buffer_size);
+	//global_buffer = malloc(buffer_size);
+#if 0
 	for (cpu = 0; cpu < num_cpus; cpu++) {
 //#pragma omp parallel
 	        //{
@@ -247,7 +248,6 @@ int main()
                 	//goto END;
 			continue;
             	}
-#if 0
 		if (ioctl(fd[cpu], REG_CURRENT_PROCESS)) {
                         fprintf(stderr, "REG_CURRENT_PROCESS failed on cpu %d\n", cpu);
                         //goto END;
@@ -258,47 +258,74 @@ int main()
                         //goto END;
 			continue;
                 }
-#endif
             	//fds[count].events = POLLIN | POLLRDNORM;
             	nopfds++;
 	}
+#endif
 
-	// fork child here
-	/*cpid = fork();
-        if (cpid == -1) {
-                perror("fork");
-                exit(EXIT_FAILURE);
-        }*/
-
+	
+#if 0
 	for (int i = 0; i < nopfds; i++)
         	ioctl(fd[i], RESET_BUFFER);
+#endif
 
 	#pragma omp parallel
 	{
-		ioctl(fd[omp_get_thread_num()], REG_CURRENT_PROCESS); 
-		ioctl(fd[omp_get_thread_num()], ASSIGN_FD, fd[omp_get_thread_num()]);
-		if(omp_get_thread_num() % 5 == 0)
-		{
-			fprintf(stderr, "thread %d has OS id %ld\n", omp_get_thread_num(), syscall(__NR_gettid));
+		my_id = omp_get_thread_num();
+		n_op_samples[my_id] = 0;
+        	n_lost_op_samples[my_id] = 0;
+		global_buffer[my_id] = malloc(buffer_size);
+		sprintf(filename, "/dev/cpu/%d/ibs/op", my_id);
+                fd[my_id] = open(filename, O_RDONLY | O_NONBLOCK);
+
+                if (fd[my_id] < 0) {
+                        fprintf(stderr, "Could not open %s\n", filename);
+                        goto END;
+                        //continue;
+                }
+
+                ioctl(fd[my_id], SET_BUFFER_SIZE, buffer_size);
+                //ioctl(fd[cpu], SET_POLL_SIZE, poll_size / sizeof(ibs_op_t));
+                ioctl(fd[my_id], SET_MAX_CNT, op_cnt_max_to_set);
+		if (ioctl(fd[my_id], IBS_ENABLE)) {
+                        fprintf(stderr, "IBS op enable failed on cpu %d\n", my_id);
+                        goto END;
+                        //continue;
+                }
+		//for (int i = 0; i < nopfds; i++)
+                ioctl(fd[my_id], RESET_BUFFER);
+		ioctl(fd[my_id], REG_CURRENT_PROCESS); 
+		ioctl(fd[my_id], ASSIGN_FD, fd[my_id]);
+		//if(omp_get_thread_num() % 5 == 0)
+		//{
+			fprintf(stderr, "thread %d has OS id %ld\n", my_id, syscall(__NR_gettid));
 			long sum = 0;
-			for(i = 0; i < 10000000; i++) {
+			for(i = 0; i < 100000000; i++) {
 				arr[i%100000] = 100;
 			}
 			fprintf(stderr, "sum's address: %lx\n",(long unsigned int) &sum);
-		}
+		//}
+		ioctl(fd[my_id], IBS_DISABLE);
+END:
+		close(fd[my_id]);
+		fprintf(stderr, "n_op_samples: %d in thread %d\n", n_op_samples[my_id], my_id);
+        	fprintf(stderr, "n_lost_op_samples: %d\n", n_lost_op_samples[my_id]);
+
 	}
 	//while (!waitpid(cpid, &i, WNOHANG));
-	
+
+#if 0	
 	for (int i = 0; i < nopfds; i++) {
         	ioctl(fd[i], IBS_DISABLE);
 //END:
 		close(fd[i]);
     	}
+#endif
 
 	free(fd);
 	//fprintf(stderr, "no problem until this point, nopfds: %d, sum: %ld\n", nopfds, sum);
-	fprintf(stderr, "n_op_samples: %d\n", n_op_samples);
-	fprintf(stderr, "n_lost_op_samples: %d\n", n_lost_op_samples);
+	//fprintf(stderr, "n_op_samples: %d\n", n_op_samples);
+	//fprintf(stderr, "n_lost_op_samples: %d\n", n_lost_op_samples);
 	return 0;
 	// print results here
 
