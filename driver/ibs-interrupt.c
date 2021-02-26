@@ -47,7 +47,7 @@ void handle_ibs_work(struct irq_work *w)
 	//struct ibs_dev *dev = container_of((struct tasklet_struct *) w, struct ibs_dev, bottom_half);
 	struct ibs_dev *dev = container_of(w, struct ibs_dev, bottom_half);
 
-        if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0) {
+        if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0 && current->pid == dev->target_process->pid) {
 		struct kernel_siginfo info;
         	memset(&info, 0, sizeof(struct kernel_siginfo));
         	info.si_signo = SIGNEW;
