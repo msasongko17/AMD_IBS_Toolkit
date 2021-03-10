@@ -32,7 +32,7 @@
 #include <linux/irq_work.h>
 #endif
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(2,6,37) || LINUX_VERSION_CODE >= KERNEL_VERSION(5,10,0)
 #include <asm/apic.h>
 #endif
 
