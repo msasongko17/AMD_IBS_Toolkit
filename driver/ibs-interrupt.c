@@ -187,7 +187,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	unsigned int old_wr = atomic_long_read(&dev->wr);
 	unsigned int new_wr = (old_wr + 1) % dev->capacity;
 	struct ibs_op *sample;
-	u64 tmp;
+	u64 tmp, op_data_tmp, op_data3_tmp;
 
 	//struct kernel_siginfo info;
 
@@ -205,17 +205,22 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		atomic_long_inc(&dev->lost);
 		goto out;
 	}
-	sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
 
-	collect_op_data(dev, sample);
+	rdmsrl(MSR_IBS_OP_DATA, op_data_tmp);
+	rdmsrl(MSR_IBS_OP_DATA3, op_data3_tmp);
+
+	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
+		sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
+
+		collect_op_data(dev, sample);
 	
 	/* Logically this is part of collect_common_data. However we can save
 	 * an MSR access beacause we already read the MSR_IBS_OP_CTL */
-	sample->op_ctl = tmp;
-	collect_common_data(sample);
+		sample->op_ctl = tmp;
+		collect_common_data(sample);
 
-	atomic_long_set(&dev->wr, new_wr);
-	atomic_long_inc(&dev->entries);
+		atomic_long_set(&dev->wr, new_wr);
+		atomic_long_inc(&dev->entries);
 
 	// before
 	//unsigned int minor = iminor(inode);
@@ -235,13 +240,14 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	//here
 	//printk(KERN_INFO "interrupt1 happens in thread %d or %d, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-	irq_work_queue(&dev->bottom_half);
+		irq_work_queue(&dev->bottom_half);
 	//tasklet_schedule(&dev->bottom_half);
 #else
 	/* Add more work directly into the NMI handler, but in older kernels, we
 	 * didn't have access to IRQ work queues. */
-	wake_up_queues(dev);
+		wake_up_queues(dev);
 #endif
+	}
 
 out:
 	tmp = randomize_op_ctl(dev->ctl);

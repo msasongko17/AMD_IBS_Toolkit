@@ -40,6 +40,8 @@ int buffer_size = 0;
 char *global_buffer[1024] = {NULL};
 
 int arr[100000];
+int global_var;
+int global_arr[2];
 
 int thread_count = 0;
 __thread int my_id = -1;
@@ -186,8 +188,12 @@ void sig_event_handler(int n, siginfo_t *info, void *unused)
 		offset += i * sizeof(ibs_op_t);
 		ibs_op_t *op_data = (ibs_op_t *) sample_buffer;
 		//fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid);
+#if 0		
 		if (op_data->op_data3.reg.ibs_lin_addr_valid)
 			fprintf(stderr, " sampling timestamp: %ld, cpu: %d, tid: %d, pid: %d, sampled address: %lx, ld_op: %d, st_op:%d, handled by thread %ld, i: %d out of %d items in buffer\n", op_data->tsc, op_data->cpu, op_data->tid, op_data->pid, op_data->dc_lin_ad, op_data->op_data3.reg.ibs_ld_op, op_data->op_data3.reg.ibs_st_op, syscall(SYS_gettid), i, num_items);
+#endif
+		if (op_data->op_data3.reg.ibs_phy_addr_valid == 1 && op_data->kern_mode == 0 && (op_data->op_data3.reg.ibs_ld_op == 1 || op_data->op_data3.reg.ibs_st_op == 1))
+			fprintf(stderr, "op_data->dc_phys_ad.reg.bs_dc_phys_addr: %ld op_data->dc_lin_ad: %ld in tid: %d op_data->op_data3.reg.ibs_lin_addr_valid: %d\n", op_data->dc_phys_ad.reg.ibs_dc_phys_addr, op_data->dc_lin_ad, op_data->tid, op_data->op_data3.reg.ibs_lin_addr_valid);
 	}
 	free (sample_buffer);
 	// after
@@ -287,6 +293,7 @@ int main()
                 ioctl(fd[my_id], SET_BUFFER_SIZE, buffer_size);
                 //ioctl(fd[cpu], SET_POLL_SIZE, poll_size / sizeof(ibs_op_t));
                 ioctl(fd[my_id], SET_MAX_CNT, op_cnt_max_to_set);
+#if 0
 		if (ioctl(fd[my_id], IBS_ENABLE)) {
                         fprintf(stderr, "IBS op enable failed on cpu %d\n", my_id);
                         goto END;
@@ -294,14 +301,23 @@ int main()
                 }
 		//for (int i = 0; i < nopfds; i++)
                 ioctl(fd[my_id], RESET_BUFFER);
+#endif
 		ioctl(fd[my_id], REG_CURRENT_PROCESS); 
 		ioctl(fd[my_id], ASSIGN_FD, fd[my_id]);
+		if (ioctl(fd[my_id], IBS_ENABLE)) {
+                        fprintf(stderr, "IBS op enable failed on cpu %d\n", my_id);
+                        goto END;
+                        //continue;
+                }
+                //for (int i = 0; i < nopfds; i++)
+                ioctl(fd[my_id], RESET_BUFFER);
 		//if(omp_get_thread_num() % 5 == 0)
 		//{
 			fprintf(stderr, "thread %d has OS id %ld\n", my_id, syscall(__NR_gettid));
 			long sum = 0;
-			for(i = 0; i < 100000000; i++) {
-				arr[i%100000] = 100;
+			for(int i = 0; i < 100000000; i++) {
+				//global_var += 100;
+				global_arr[i % 2] += 100;
 			}
 			fprintf(stderr, "sum's address: %lx\n",(long unsigned int) &sum);
 		//}
