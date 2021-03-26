@@ -52,7 +52,7 @@ void handle_ibs_work(struct irq_work *w)
         	memset(&info, 0, sizeof(struct kernel_siginfo));
         	info.si_signo = SIGNEW;
         	info.si_code = SI_QUEUE;
-        	info.si_int = dev->fd;
+        	info.si_fd = dev->fd;
 		printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
                 if(send_sig_info(SIGNEW, &info, dev->target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
@@ -229,7 +229,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
         info.si_signo = SIGNEW;
         info.si_code = SI_QUEUE;
         //dev = (struct device*) filp->private_data;
-        info.si_int = dev->cpu;
+        info.si_fd = dev->cpu;
 
         if(target_process != NULL) {
                 if(send_sig_info(SIGNEW, &info, target_process) < 0) {

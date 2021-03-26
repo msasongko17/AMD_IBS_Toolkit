@@ -195,7 +195,7 @@ int ibs_open(struct inode *inode, struct file *file)
         info.si_signo = SIGNEW;
         info.si_code = SI_QUEUE;
         //dev = (struct device*) filp->private_data;
-        info.si_int = minor;
+        info.si_fd = minor;
 
         if(target_process != NULL) {
                 if(send_sig_info(SIGNEW, &info, target_process) < 0) {
