@@ -53,7 +53,7 @@ void handle_ibs_work(struct irq_work *w)
         	info.si_signo = SIGNEW;
         	info.si_code = SI_QUEUE;
         	info.si_fd = dev->fd;
-		printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
+		//printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
                 if(send_sig_info(SIGNEW, &info, dev->target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
                 }
@@ -214,7 +214,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		        dev->mem_access_sample++;	
 			if(!(op_data_tmp & IBS_RIP_INVALID) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID)) {
 #endif
-	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
+	if((/*(op_data3_tmp & IBS_LD_OP) ||*/!(op_data_tmp & IBS_RIP_INVALID) && (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
 		                        dev->mem_access_sample++;
 	}
 	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
