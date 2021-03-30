@@ -39,6 +39,7 @@ struct ibs_op {
 	int	cpu;
 	int	kern_mode;
 	int mem_access_sample;
+	int valid_mem_access_sample;
 };
 
 struct ibs_fetch {
@@ -91,6 +92,7 @@ struct ibs_dev {
 	int workaround_fam17h_zn;
 
 	int mem_access_sample;
+	int valid_mem_access_sample;
 	int invalid_mem_access_sample;
 	int kern_sample;	
 	int fd;

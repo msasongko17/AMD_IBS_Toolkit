@@ -214,12 +214,13 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		        dev->mem_access_sample++;	
 			if(!(op_data_tmp & IBS_RIP_INVALID) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID)) {
 #endif
-	if((/*(op_data3_tmp & IBS_LD_OP) ||*/!(op_data_tmp & IBS_RIP_INVALID) && (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
-		                        dev->mem_access_sample++;
+	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
+		    		dev->mem_access_sample++;
 	}
-	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
+	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
 				sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
 
+				dev->valid_mem_access_sample++;
 				collect_op_data(dev, sample);
 	
 				/* Logically this is part of collect_common_data. However we can save
@@ -227,6 +228,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 				sample->op_ctl = tmp;
 				collect_common_data(sample);
 				sample->mem_access_sample = dev->mem_access_sample;
+				sample->valid_mem_access_sample = dev->valid_mem_access_sample;
 
 				atomic_long_set(&dev->wr, new_wr);
 				atomic_long_inc(&dev->entries);
@@ -255,15 +257,6 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 				/* Add more work directly into the NMI handler, but in older kernels, we
 	 			* didn't have access to IRQ work queues. */
 				wake_up_queues(dev);
-#endif
-#if 0	
-			} else {
-				dev->invalid_mem_access_sample++;
-			}	
-		}
-	} else {
-		dev->kern_sample++;
-	}	
 #endif
 	}
 out:

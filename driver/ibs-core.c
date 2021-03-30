@@ -149,6 +149,8 @@ static void init_ibs_op_dev(struct ibs_dev *dev, int cpu)
 	init_ibs_dev(dev, cpu);
 	dev->flavor = IBS_OP;
 	dev->entry_size = sizeof(struct ibs_op);
+	dev->mem_access_sample = 0;
+	dev->valid_mem_access_sample = 0;
 	mutex_init(&dev->ctl_lock);
 }
 
