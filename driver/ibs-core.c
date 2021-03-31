@@ -149,8 +149,6 @@ static void init_ibs_op_dev(struct ibs_dev *dev, int cpu)
 	init_ibs_dev(dev, cpu);
 	dev->flavor = IBS_OP;
 	dev->entry_size = sizeof(struct ibs_op);
-	dev->mem_access_sample = 0;
-	dev->valid_mem_access_sample = 0;
 	mutex_init(&dev->ctl_lock);
 }
 
@@ -220,12 +218,6 @@ static int ibs_device_create(int flavor, int cpu)
 
 static void ibs_device_destroy(int flavor, int cpu)
 {
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,33)
-        struct ibs_dev *dev = this_cpu_ptr(pcpu_op_dev);
-#else   
-        struct ibs_dev *dev = per_cpu_ptr(pcpu_op_dev, smp_processor_id());
-#endif
-	printk(KERN_INFO "the final statistics in cpu %d are mem_access_sample: %d, invalid_mem_access_sample: %d, kern_sample: %d\n", cpu, dev->mem_access_sample, dev->invalid_mem_access_sample, dev->kern_sample);
 	device_destroy(ibs_class, MKDEV(ibs_major, IBS_MINOR(flavor, cpu)));
 }
 

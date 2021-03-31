@@ -53,7 +53,7 @@ void handle_ibs_work(struct irq_work *w)
         	info.si_signo = SIGNEW;
         	info.si_code = SI_QUEUE;
         	info.si_fd = dev->fd;
-		//printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
+		printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
                 if(send_sig_info(SIGNEW, &info, dev->target_process) < 0) {
                         printk(KERN_INFO "Unable to send signal\n");
                 }
@@ -208,57 +208,47 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 
 	rdmsrl(MSR_IBS_OP_DATA, op_data_tmp);
 	rdmsrl(MSR_IBS_OP_DATA3, op_data3_tmp);
-#if 0
-	if(user_mode(regs)) {
-		if((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) {
-		        dev->mem_access_sample++;	
-			if(!(op_data_tmp & IBS_RIP_INVALID) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID)) {
-#endif
-	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
-		    		dev->mem_access_sample++;
-	}
-	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
-				sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
 
-				dev->valid_mem_access_sample++;
-				collect_op_data(dev, sample);
+	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
+		sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
+
+		collect_op_data(dev, sample);
 	
-				/* Logically this is part of collect_common_data. However we can save
-	 			* an MSR access beacause we already read the MSR_IBS_OP_CTL */
-				sample->op_ctl = tmp;
-				collect_common_data(sample);
-				sample->mem_access_sample = dev->mem_access_sample;
-				sample->valid_mem_access_sample = dev->valid_mem_access_sample;
+	/* Logically this is part of collect_common_data. However we can save
+	 * an MSR access beacause we already read the MSR_IBS_OP_CTL */
+		sample->op_ctl = tmp;
+		collect_common_data(sample);
 
-				atomic_long_set(&dev->wr, new_wr);
-				atomic_long_inc(&dev->entries);
+		atomic_long_set(&dev->wr, new_wr);
+		atomic_long_inc(&dev->entries);
 
-				// before
-				//unsigned int minor = iminor(inode);
+	// before
+	//unsigned int minor = iminor(inode);
 
-				/*memset(&info, 0, sizeof(struct kernel_siginfo));
-        			info.si_signo = SIGNEW;
-        			info.si_code = SI_QUEUE;
-        			//dev = (struct device*) filp->private_data;
-        			info.si_fd = dev->cpu;
+	/*memset(&info, 0, sizeof(struct kernel_siginfo));
+        info.si_signo = SIGNEW;
+        info.si_code = SI_QUEUE;
+        //dev = (struct device*) filp->private_data;
+        info.si_fd = dev->cpu;
 
-        			if(target_process != NULL) {
-                			if(send_sig_info(SIGNEW, &info, target_process) < 0) {
-                        			printk(KERN_INFO "Unable to send signal\n");
-                			}
-        			}*/
-				// after
-				//here
-				//printk(KERN_INFO "interrupt1 happens in thread %d or %d, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
+        if(target_process != NULL) {
+                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
+                        printk(KERN_INFO "Unable to send signal\n");
+                }
+        }*/
+	// after
+	//here
+	//printk(KERN_INFO "interrupt1 happens in thread %d or %d, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
-				irq_work_queue(&dev->bottom_half);
-				//tasklet_schedule(&dev->bottom_half);
+		irq_work_queue(&dev->bottom_half);
+	//tasklet_schedule(&dev->bottom_half);
 #else
-				/* Add more work directly into the NMI handler, but in older kernels, we
-	 			* didn't have access to IRQ work queues. */
-				wake_up_queues(dev);
+	/* Add more work directly into the NMI handler, but in older kernels, we
+	 * didn't have access to IRQ work queues. */
+		wake_up_queues(dev);
 #endif
 	}
+
 out:
 	tmp = randomize_op_ctl(dev->ctl);
 	if (dev->workaround_fam15h_err_718)

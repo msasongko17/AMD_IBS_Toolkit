@@ -520,8 +520,6 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case REG_CURRENT_PROCESS:
 		dev->target_process = get_current();
-		dev->mem_access_sample = 0;
-		dev->valid_mem_access_sample = 0;
                 signum = SIGNEW;
 		break;
 	case ASSIGN_FD:

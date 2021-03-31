@@ -38,8 +38,6 @@ struct ibs_op {
 	pid_t	pid;
 	int	cpu;
 	int	kern_mode;
-	int mem_access_sample;
-	int valid_mem_access_sample;
 };
 
 struct ibs_fetch {
@@ -91,10 +89,6 @@ struct ibs_dev {
 	int workaround_fam15h_err_718;
 	int workaround_fam17h_zn;
 
-	int mem_access_sample;
-	int valid_mem_access_sample;
-	int invalid_mem_access_sample;
-	int kern_sample;	
 	int fd;
 	struct task_struct *target_process;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
