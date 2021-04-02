@@ -15,6 +15,7 @@
 
 //#define REG_CURRENT_PROCESS 101
 
+#define PERF_SIGNAL (SIGRTMIN+4)
 #define SIGNEW 44
 #define SET_BUFFER_SIZE 0xEU
 #define BUFFER_SIZE_B   (1 << 20)

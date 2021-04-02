@@ -58,6 +58,7 @@
 
 #define ASSIGN_FD 102
 
+//#define PERF_SIGNAL (SIGRTMIN+4)
 #define SIGNEW 44
 
 static int signum = 0;
@@ -520,10 +521,12 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case REG_CURRENT_PROCESS:
 		dev->target_process = get_current();
-                signum = SIGNEW;
+                signum = /*PERF_SIGNAL;*/SIGNEW;
 		break;
 	case ASSIGN_FD:
                 dev->fd = (int) arg;
+		dev->mem_access_sample = 0;
+		dev->valid_mem_access_sample = 0;
                 break;
 	default:	/* Command not recognized */
 		retval = -ENOTTY;
