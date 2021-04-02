@@ -45,6 +45,7 @@ void handle_ibs_work(struct irq_work *w)
 //void handle_ibs_work(struct tasklet_struct *w)
 //void handle_ibs_work(long unsigned int w)
 {
+#if 0
 	//struct ibs_dev *dev = container_of((struct tasklet_struct *) w, struct ibs_dev, bottom_half);
 	struct ibs_dev *dev = container_of(w, struct ibs_dev, bottom_half);
 
@@ -59,6 +60,7 @@ void handle_ibs_work(struct irq_work *w)
                         printk(KERN_INFO "Unable to send signal\n");
                 }
         }
+#endif
 }
 #endif
 
@@ -214,7 +216,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		dev->mem_access_sample++;
 	}
 
-	if( /*!(op_data_tmp & IBS_RIP_INVALID) &&*/ ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
+	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
 		dev->valid_mem_access_sample++;
 		sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
 
@@ -229,6 +231,19 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 
 		atomic_long_set(&dev->wr, new_wr);
 		atomic_long_inc(&dev->entries);
+// before
+		if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0 && current->pid == dev->target_process->pid) {
+                	struct kernel_siginfo info;
+                	memset(&info, 0, sizeof(struct kernel_siginfo));
+                	info.si_signo = /*PERF_SIGNAL;*/SIGNEW;
+                	info.si_code = SI_QUEUE;
+                	info.si_fd = dev->fd;
+                	printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
+                	if(send_sig_info(/*PERF_SIGNAL*/ SIGNEW, &info, dev->target_process) < 0) {
+                        	printk(KERN_INFO "Unable to send signal\n");
+                	}
+        	}	
+// after
 
 	// before
 	//unsigned int minor = iminor(inode);
