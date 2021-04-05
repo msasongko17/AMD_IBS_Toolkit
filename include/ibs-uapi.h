@@ -322,4 +322,11 @@ typedef ibs_fetch_t ibs_fetch_v1_t;
 #define GET_LOST        0xEEU
 #define DEBUG_BUFFER    0xEFU
 
+#define IBS_CTL_BACKUP	0x11U
+#define IBS_CTL_RELOAD  0x12U
+
+#define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
+
+#define ASSIGN_FD 102
+
 #endif        /* IBS_UAPI_H */

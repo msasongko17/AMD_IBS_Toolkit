@@ -72,6 +72,7 @@ struct ibs_dev {
 	atomic_long_t poll_threshold;	/* min size for poll to return */
 
 	u64 ctl;	/* copy of op/fetch ctl MSR to store control options */
+	u64 ctl_temp;
 	struct mutex ctl_lock;	/* lock for device control options */
 
 	int cpu;		/* this device's cpu id */

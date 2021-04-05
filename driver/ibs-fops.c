@@ -54,9 +54,9 @@
 #include "ibs-utils.h"
 #include "ibs-workarounds.h"
 
-#define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
+//#define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
 
-#define ASSIGN_FD 102
+//#define ASSIGN_FD 102
 
 //#define PERF_SIGNAL (SIGRTMIN+4)
 #define SIGNEW 44
@@ -341,6 +341,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	long retval = 0;
 	struct ibs_dev *dev = file->private_data;
 	int cpu = dev->cpu;
+	//u64 tmp;
 
 	/* Lock-free commands */
 	switch (cmd) {
@@ -398,6 +399,17 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			dev->ctl &= ~IBS_FETCH_EN;
 		}
 		break;
+	case IBS_CTL_BACKUP:
+                if (dev->flavor == IBS_OP) {
+                       rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &dev->ctl_temp);
+                }
+                break;
+	case IBS_CTL_RELOAD:
+                if (dev->flavor == IBS_OP) {
+                       //rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &dev->ctl_temp);
+		       wrmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, dev->ctl_temp);
+                }
+                break;	
 	case SET_CUR_CNT:
 	case SET_CNT:
 		if (dev->flavor == IBS_OP) {
@@ -419,10 +431,18 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case GET_CUR_CNT:
 	case GET_CNT:
 		if (dev->flavor == IBS_OP)
-			if (dev->ibs_op_cnt_ext_supported)
-				retval = gather_bits(dev->ctl, IBS_OP_CUR_CNT_23);
-			else
-				retval = gather_bits(dev->ctl, IBS_OP_CUR_CNT_OLD);
+			if (dev->ibs_op_cnt_ext_supported) {
+				retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
+				//rdmsrl(MSR_IBS_OP_CTL, tmp);
+				//rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
+				//retval = gather_bits(tmp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
+			}
+			else {
+				retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
+				//rdmsrl(MSR_IBS_OP_CTL, tmp);
+				//rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
+                                //retval = gather_bits(tmp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
+			}
 		else	/* dev->flavor == IBS_FETCH */
 			retval = gather_bits(dev->ctl, IBS_FETCH_CNT);
 		break;
@@ -527,6 +547,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
                 dev->fd = (int) arg;
 		dev->mem_access_sample = 0;
 		dev->valid_mem_access_sample = 0;
+		dev->ctl_temp = 0;
                 break;
 	default:	/* Command not recognized */
 		retval = -ENOTTY;

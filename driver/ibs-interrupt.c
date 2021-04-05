@@ -216,7 +216,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		dev->mem_access_sample++;
 	}
 
-	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
+	if( /*!(op_data_tmp & IBS_RIP_INVALID) &&*/ ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {
 		dev->valid_mem_access_sample++;
 		sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
 
