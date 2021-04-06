@@ -341,7 +341,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	long retval = 0;
 	struct ibs_dev *dev = file->private_data;
 	int cpu = dev->cpu;
-	//u64 tmp;
+	u64 tmp;
 
 	/* Lock-free commands */
 	switch (cmd) {
@@ -432,16 +432,16 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 	case GET_CNT:
 		if (dev->flavor == IBS_OP)
 			if (dev->ibs_op_cnt_ext_supported) {
-				retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
+				//retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
 				//rdmsrl(MSR_IBS_OP_CTL, tmp);
-				//rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
-				//retval = gather_bits(tmp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
+				rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
+				retval = gather_bits(tmp, IBS_OP_CUR_CNT_23 /*IBS_OP_CUR_CNT*/);
 			}
 			else {
-				retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
+				//retval = gather_bits(dev->ctl_temp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
 				//rdmsrl(MSR_IBS_OP_CTL, tmp);
-				//rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
-                                //retval = gather_bits(tmp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
+				rdmsrl_on_cpu(cpu, MSR_IBS_OP_CTL, &tmp);
+                                retval = gather_bits(tmp, IBS_OP_CUR_CNT_OLD /*IBS_OP_CUR_CNT*/);
 			}
 		else	/* dev->flavor == IBS_FETCH */
 			retval = gather_bits(dev->ctl, IBS_FETCH_CNT);
