@@ -209,6 +209,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		goto out;
 	}
 
+	dev->micro_op_sample++;
 	rdmsrl(MSR_IBS_OP_DATA, op_data_tmp);
 	rdmsrl(MSR_IBS_OP_DATA3, op_data3_tmp);
 
@@ -226,6 +227,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	 * an MSR access beacause we already read the MSR_IBS_OP_CTL */
 		sample->op_ctl = tmp;
 		collect_common_data(sample);
+		sample->micro_op_sample = dev->micro_op_sample;
 		sample->mem_access_sample = dev->mem_access_sample;
 		sample->valid_mem_access_sample = dev->valid_mem_access_sample;
 

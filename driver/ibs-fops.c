@@ -545,6 +545,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		break;
 	case ASSIGN_FD:
                 dev->fd = (int) arg;
+		dev->micro_op_sample = 0;
 		dev->mem_access_sample = 0;
 		dev->valid_mem_access_sample = 0;
 		dev->ctl_temp = 0;

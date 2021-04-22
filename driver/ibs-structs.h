@@ -38,6 +38,7 @@ struct ibs_op {
 	pid_t	pid;
 	int	cpu;
 	int	kern_mode;
+	int     micro_op_sample;
 	int 	mem_access_sample;
 	int 	valid_mem_access_sample;
 };
@@ -91,6 +92,7 @@ struct ibs_dev {
 	int workaround_fam10h_err_420;
 	int workaround_fam15h_err_718;
 	int workaround_fam17h_zn;
+	int micro_op_sample;
 	int mem_access_sample;
 	int valid_mem_access_sample;
 
