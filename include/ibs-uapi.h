@@ -147,7 +147,7 @@ typedef struct ibs_op {
         int                     pid;
         int                     cpu;
         int                     kern_mode;
-	int			micro_op_sample
+	int			micro_op_sample;
 	int 			mem_access_sample;
 	int                     valid_mem_access_sample;
 } ibs_op_t;

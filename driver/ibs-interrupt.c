@@ -189,7 +189,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 #endif
 	unsigned int old_wr = atomic_long_read(&dev->wr);
 	unsigned int new_wr = (old_wr + 1) % dev->capacity;
-	struct ibs_op *sample;
+	//struct ibs_op *sample;
 	u64 tmp, op_data_tmp, op_data3_tmp;
 
 	//struct kernel_siginfo info;
@@ -213,10 +213,12 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	rdmsrl(MSR_IBS_OP_DATA, op_data_tmp);
 	rdmsrl(MSR_IBS_OP_DATA3, op_data3_tmp);
 
+	printk(KERN_INFO "There have been %d samples in cpu %d\n", dev->micro_op_sample, dev->cpu);
 	if(((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && user_mode(regs)) {
 		dev->mem_access_sample++;
 	}
 
+#if 0
 	if( !(op_data_tmp & IBS_RIP_INVALID) && ((op_data3_tmp & IBS_LD_OP) || (op_data3_tmp & IBS_ST_OP)) && (op_data3_tmp & IBS_DC_LIN_ADDR_VALID) && user_mode(regs)) {	
 		dev->valid_mem_access_sample++;
 		sample = (struct ibs_op *)(dev->buf + (old_wr * dev->entry_size));
@@ -273,6 +275,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 		wake_up_queues(dev);
 #endif
 	}
+#endif
 
 out:
 	tmp = randomize_op_ctl(dev->ctl);

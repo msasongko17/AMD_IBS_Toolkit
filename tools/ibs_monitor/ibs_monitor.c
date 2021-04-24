@@ -34,10 +34,14 @@
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 #include <sys/wait.h>
+#include <sched.h>
 
 #include "ibs-uapi.h"
 #include "ibs_monitor.h"
 #include "cpu_check.h"
+//#include "omp.h"
+
+
 
 // Note that this program does not use libIBS. This is an example of a program
 // that directly talks to the AMD Research IBS driver using the ioctl()
@@ -558,10 +562,10 @@ int main(int argc, char *argv[])
     int flavors = 0;
     FILE *opf = NULL;
     FILE *fetchf = NULL;
-    int i;
+    //int i;
     pid_t cpid;
 
-    set_global_defaults();
+    //set_global_defaults();
 
     parse_args(argc, argv, &opf, &fetchf, &flavors);
     // Reset argv to real program
@@ -575,8 +579,32 @@ int main(int argc, char *argv[])
     int num_cpus = get_nprocs_conf();
     // Add enough space for fetch and op FDs for every core.
     fds = calloc(num_cpus*2, sizeof(struct pollfd));
-    enable_ibs_flavors(fds, &nopfds, &nfetchfds, flavors);
 
+    cpu_set_t  mask;
+    CPU_ZERO(&mask);
+    CPU_SET(0, &mask);
+    //CPU_SET(2, &mask);
+    sched_setaffinity(0, sizeof(mask), &mask);
+
+    //enable_ibs_flavors(fds, &nopfds, &nfetchfds, flavors);
+
+    char filename [64];
+    sprintf(filename, "/dev/cpu/0/ibs/op");
+            fds[0].fd = open(filename, O_RDONLY | O_NONBLOCK);
+            if (fds[0].fd < 0) {
+                fprintf(stderr, "Could not open %s\n", filename);
+                //continue;
+            }
+
+            ioctl(fds[0].fd, SET_BUFFER_SIZE, buffer_size);
+            //ioctl(fds[0].fd, SET_POLL_SIZE,
+                  //poll_size / sizeof(ibs_op_t));
+            ioctl(fds[0].fd, SET_MAX_CNT, op_cnt_max_to_set);
+            if (ioctl(fds[0].fd, IBS_ENABLE)) {
+                fprintf(stderr, "IBS op enable failed on cpu 0\n");
+                //continue;
+            }
+#if 0
     cpid = fork();
     if (cpid == -1) {
         perror("fork");
@@ -616,13 +644,28 @@ int main(int argc, char *argv[])
 #endif
         exit(EXIT_SUCCESS);
     }
+#endif
+    //reset_ibs_buffers(fds, nopfds + nfetchfds);
 
-    reset_ibs_buffers(fds, nopfds + nfetchfds);
+    ioctl(fds[0].fd, RESET_BUFFER);
+//#if 0
+//#pragma omp parallel
+//{
+    int val = 0;
+        __asm__ __volatile__ ("movl $100000000, %%ecx\n\t"
+                "1:\n\t"
+                "movl $1, %0\n\t"
+                "loop 1b\n\t"
+                : "=m" (val)
+                :
+                : "memory", "%ecx"
+            );
+//}
+    //while (!waitpid(cpid, &i, WNOHANG));
+        //poll_ibs(fds, nopfds, nfetchfds, opf, fetchf);
 
-    while (!waitpid(cpid, &i, WNOHANG))
-        poll_ibs(fds, nopfds, nfetchfds, opf, fetchf);
-
-    flush_ibs_buffers(fds, nopfds, nfetchfds, opf, fetchf);
+    //flush_ibs_buffers(fds, nopfds, nfetchfds, opf, fetchf);
+//#endif
 
     disable_ibs(fds, nopfds + nfetchfds);
 

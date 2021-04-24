@@ -14,6 +14,11 @@
 #include <sys/syscall.h>
 #include <omp.h>
 
+#if 0
+#include "ibs-uapi.h"
+#include "ibs_monitor.h"
+#include "cpu_check.h"
+#endif
 //#define REG_CURRENT_PROCESS 101
 
 #define SIGNEW 44
@@ -25,6 +30,9 @@
 #define IBS_DISABLE     0x1U
 #define RESET_BUFFER    0x10U
 #define GET_LOST        0xEEU
+
+#define SET_POLL_SIZE   0xCU
+#define GET_POLL_SIZE   0xDU
 
 #define REG_CURRENT_PROCESS _IOW('a', 'a', int32_t*)
 #define ASSIGN_FD 102
@@ -38,6 +46,10 @@ int8_t read_buf[1024];
 int op_cnt_max_to_set = 0;
 int buffer_size = 0;
 char *global_buffer[1024] = {NULL};
+
+int poll_percent = 0;
+int poll_size = 0;
+int poll_timeout = 0;
 
 int arr[100000];
 int global_var;
@@ -210,6 +222,51 @@ void sig_event_handler(int n, siginfo_t *info, void *unused)
     }
 }*/
 
+static void cpuid(uint32_t *eax, uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+	    asm volatile("cpuid" : "=a" (*eax), "=b" (*ebx), "=c" (*ecx), "=d" (*edx)
+			                : "0" (*eax), "2" (*ecx));
+}
+
+uint32_t get_deep_ibs_info(void)
+{
+    uint32_t eax = 0x8000001b;
+    uint32_t ebx = 0, ecx = 0, edx = 0;
+    cpuid(&eax, &ebx, &ecx, &edx);
+    return eax;
+}
+
+void set_global_op_sample_rate(int sample_rate)
+{
+    int max_sample_rate = 0;
+    // Check for proper IBS support before we try to read the CPUID information
+    // about the maximum sample rate.
+    //check_amd_processor();
+    //check_basic_ibs_support();
+    //check_ibs_op_support();
+
+    if (sample_rate < 0x90)
+    {   
+        fprintf(stderr, "Attempting to set IBS op sample rate too low - %d\n", sample_rate);
+        fprintf(stderr, "This generation core should not be set below %d\n", 0x90);
+        exit(EXIT_FAILURE);
+    }
+    uint32_t ibs_id = get_deep_ibs_info();
+    uint32_t extra_bits = (ibs_id & (1 << 6)) >> 6;
+    if (!extra_bits)
+        max_sample_rate = 1<<20;
+    else
+        max_sample_rate = 1<<27;
+
+    if (sample_rate >= max_sample_rate)
+    {
+        fprintf(stderr, "Attempting to set IBS op sample rate too high - %d\n", sample_rate);
+        fprintf(stderr, "This generation core can only support up to: %d\n", max_sample_rate-1);
+        exit(EXIT_FAILURE);
+    }
+    op_cnt_max_to_set = sample_rate >> 4;
+}
+
 int main()
 {
 	char filename [64];
@@ -222,7 +279,8 @@ int main()
 	int cpu;
 	int * fd = calloc(num_cpus, sizeof(int));
 	buffer_size = BUFFER_SIZE_B;
-	op_cnt_max_to_set = 100000;//OP_MAX_CNT;
+	//op_cnt_max_to_set = 1000000;//OP_MAX_CNT;
+	set_global_op_sample_rate(1000000);
 	int i;
 
 	struct sigaction act;
@@ -275,8 +333,26 @@ int main()
         	ioctl(fd[i], RESET_BUFFER);
 #endif
 
+	//char filename [64];
+    sprintf(filename, "/dev/cpu/0/ibs/op");
+            fd[0] = open(filename, O_RDONLY | O_NONBLOCK);
+            if (fd[0] < 0) {
+                fprintf(stderr, "Could not open %s\n", filename);
+                //continue;
+            }
+
+            ioctl(fd[0], SET_BUFFER_SIZE, buffer_size);
+            //ioctl(fds[0].fd, SET_POLL_SIZE, 
+                  //poll_size / sizeof(ibs_op_t));
+            ioctl(fd[0], SET_MAX_CNT, op_cnt_max_to_set);
+            if (ioctl(fd[0], IBS_ENABLE)) {
+                fprintf(stderr, "IBS op enable failed on cpu 0\n");
+                //continue;
+            }
+	ioctl(fd[0], RESET_BUFFER);
 	#pragma omp parallel
 	{
+#if 0
 		my_id = omp_get_thread_num();
 		n_op_samples[my_id] = 0;
         	n_lost_op_samples[my_id] = 0;
@@ -291,7 +367,7 @@ int main()
                 }
 
                 ioctl(fd[my_id], SET_BUFFER_SIZE, buffer_size);
-                //ioctl(fd[cpu], SET_POLL_SIZE, poll_size / sizeof(ibs_op_t));
+                ioctl(fd[cpu], SET_POLL_SIZE, poll_size / sizeof(ibs_op_t));
                 ioctl(fd[my_id], SET_MAX_CNT, op_cnt_max_to_set);
 #if 0
 		if (ioctl(fd[my_id], IBS_ENABLE)) {
@@ -302,18 +378,21 @@ int main()
 		//for (int i = 0; i < nopfds; i++)
                 ioctl(fd[my_id], RESET_BUFFER);
 #endif
-		ioctl(fd[my_id], REG_CURRENT_PROCESS); 
-		ioctl(fd[my_id], ASSIGN_FD, fd[my_id]);
+		//ioctl(fd[my_id], REG_CURRENT_PROCESS); 
+		//ioctl(fd[my_id], ASSIGN_FD, fd[my_id]);
 		if (ioctl(fd[my_id], IBS_ENABLE)) {
                         fprintf(stderr, "IBS op enable failed on cpu %d\n", my_id);
-                        goto END;
+                        //goto END;
                         //continue;
                 }
+		//fds[count].events = POLLIN | POLLRDNORM;
                 //for (int i = 0; i < nopfds; i++)
-                ioctl(fd[my_id], RESET_BUFFER);
+#endif
+                //ioctl(fd[my_id], RESET_BUFFER);
 		//if(omp_get_thread_num() % 5 == 0)
 		//{
 			fprintf(stderr, "thread %d has OS id %ld\n", my_id, syscall(__NR_gettid));
+#if 0
 			long sum = 0;
 			for(int i = 0; i < 100000000; i++) {
 				//global_var += 100;
@@ -321,6 +400,16 @@ int main()
 			}
 			fprintf(stderr, "sum's address: %lx\n",(long unsigned int) &sum);
 		//}
+#endif
+		        int val = 0;
+        __asm__ __volatile__ ("movl $100000000, %%ecx\n\t"
+                "1:\n\t"
+                "movl $1, %0\n\t"
+                "loop 1b\n\t"
+                : "=m" (val)
+                :
+                : "memory", "%ecx"
+            );
 		ioctl(fd[my_id], IBS_DISABLE);
 END:
 		close(fd[my_id]);

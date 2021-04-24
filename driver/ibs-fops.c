@@ -389,6 +389,7 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 			dev->ctl |= IBS_FETCH_EN;
 			enable_ibs_fetch_on_cpu(dev, cpu, dev->ctl);
 		}
+		dev->micro_op_sample = 0;
 		break;
 	case IBS_DISABLE:
 		if (dev->flavor == IBS_OP) {
