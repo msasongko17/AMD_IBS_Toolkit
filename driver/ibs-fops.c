@@ -69,6 +69,8 @@ extern struct task_struct *target_process;
 extern void *pcpu_op_dev;
 extern void *pcpu_fetch_dev;
 
+extern struct task_struct *target_process_table[TABLE_SIZE];
+
 static inline void enable_ibs_op_on_cpu(struct ibs_dev *dev,
 		const int cpu, const u64 op_ctl)
 {
@@ -540,7 +542,8 @@ long ibs_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 		reset_ibs_buffer(dev);
 		break;
 	case REG_CURRENT_PROCESS:
-		dev->target_process = get_current();
+		target_process_table[get_current()->pid % TABLE_SIZE] = get_current();
+		//dev->target_process = get_current();
                 signum = /*PERF_SIGNAL;*/SIGNEW;
 		break;
 	case ASSIGN_FD:

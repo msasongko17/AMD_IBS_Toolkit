@@ -140,7 +140,7 @@ static void init_ibs_dev(struct ibs_dev *dev, int cpu)
 	dev->workaround_fam10h_err_420 = workaround_fam10h_err_420;
 	dev->workaround_fam15h_err_718 = workaround_fam15h_err_718;
 	dev->workaround_fam17h_zn = workaround_fam17h_zn;
-	dev->target_process = NULL;
+	//dev->target_process = NULL;
 	dev->fd = -1;
 }
 

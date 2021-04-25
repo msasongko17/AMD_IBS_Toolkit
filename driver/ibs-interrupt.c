@@ -25,7 +25,8 @@
 #define SIGNEW 44
 //#define PERF_SIGNAL (SIGRTMIN+4)
 
-struct task_struct *target_process = NULL;
+
+struct task_struct *target_process_table[TABLE_SIZE];
 
 extern void *pcpu_op_dev;
 extern void *pcpu_fetch_dev;
@@ -190,6 +191,7 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 	unsigned int old_wr = atomic_long_read(&dev->wr);
 	unsigned int new_wr = (old_wr + 1) % dev->capacity;
 	struct ibs_op *sample;
+	struct task_struct *target_process = NULL;
 	u64 tmp, op_data_tmp, op_data3_tmp;
 
 	//struct kernel_siginfo info;
@@ -233,15 +235,17 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
 
 		atomic_long_set(&dev->wr, new_wr);
 		atomic_long_inc(&dev->entries);
-// before
-		if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0 && current->pid == dev->target_process->pid) {
+// before 
+		target_process = target_process_table[current->pid % TABLE_SIZE];
+
+		if(target_process != NULL && atomic_long_read(&dev->entries) > 0 && current->pid == target_process->pid) {
                 	struct kernel_siginfo info;
                 	memset(&info, 0, sizeof(struct kernel_siginfo));
                 	info.si_signo = /*PERF_SIGNAL;*/SIGNEW;
                 	info.si_code = SI_QUEUE;
                 	info.si_fd = dev->fd;
-                	printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
-                	if(send_sig_info(/*PERF_SIGNAL*/ SIGNEW, &info, dev->target_process) < 0) {
+                	printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
+                	if(send_sig_info(/*PERF_SIGNAL*/ SIGNEW, &info, target_process) < 0) {
                         	printk(KERN_INFO "Unable to send signal\n");
                 	}
         	}	

@@ -97,11 +97,13 @@ struct ibs_dev {
 	int valid_mem_access_sample;
 
 	int fd;
-	struct task_struct *target_process;
+	//struct task_struct *target_process;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 	struct irq_work bottom_half;
 	//struct tasklet_struct bottom_half;
 #endif
 };
+
+#define TABLE_SIZE 257
 
 #endif	/* IBS_STRUCTS_H */
