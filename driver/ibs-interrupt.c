@@ -46,22 +46,6 @@ void handle_ibs_work(struct irq_work *w)
 //void handle_ibs_work(struct tasklet_struct *w)
 //void handle_ibs_work(long unsigned int w)
 {
-#if 0
-	//struct ibs_dev *dev = container_of((struct tasklet_struct *) w, struct ibs_dev, bottom_half);
-	struct ibs_dev *dev = container_of(w, struct ibs_dev, bottom_half);
-
-        if(dev->target_process != NULL && atomic_long_read(&dev->entries) > 0 && current->pid == dev->target_process->pid) {
-		struct kernel_siginfo info;
-        	memset(&info, 0, sizeof(struct kernel_siginfo));
-        	info.si_signo = /*PERF_SIGNAL;*/SIGNEW;
-        	info.si_code = SI_QUEUE;
-        	info.si_fd = dev->fd;
-		printk(KERN_INFO "interrupt happens in thread %d or %d and handled by workqueue, but signal is sent to thread %d\n", current->pid, get_current()->pid, dev->target_process->pid);
-                if(send_sig_info(/*PERF_SIGNAL*/ SIGNEW, &info, dev->target_process) < 0) {
-                        printk(KERN_INFO "Unable to send signal\n");
-                }
-        }
-#endif
 }
 #endif
 
@@ -249,24 +233,6 @@ static inline void handle_ibs_op_event(struct pt_regs *regs)
                         	printk(KERN_INFO "Unable to send signal\n");
                 	}
         	}	
-// after
-
-	// before
-	//unsigned int minor = iminor(inode);
-
-	/*memset(&info, 0, sizeof(struct kernel_siginfo));
-        info.si_signo = SIGNEW;
-        info.si_code = SI_QUEUE;
-        //dev = (struct device*) filp->private_data;
-        info.si_fd = dev->cpu;
-
-        if(target_process != NULL) {
-                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
-                        printk(KERN_INFO "Unable to send signal\n");
-                }
-        }*/
-	// after
-	//here
 	//printk(KERN_INFO "interrupt1 happens in thread %d or %d, but signal is sent to thread %d\n", current->pid, get_current()->pid, target_process->pid);
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,37)
 		irq_work_queue(&dev->bottom_half);

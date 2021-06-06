@@ -193,18 +193,7 @@ int ibs_open(struct inode *inode, struct file *file)
 	mutex_lock(&dev->ctl_lock);
 	set_ibs_defaults(dev);
 	reset_ibs_buffer(dev);
-	mutex_unlock(&dev->ctl_lock);
-	/*memset(&info, 0, sizeof(struct kernel_siginfo));
-        info.si_signo = SIGNEW;
-        info.si_code = SI_QUEUE;
-        //dev = (struct device*) filp->private_data;
-        info.si_fd = minor;
-
-        if(target_process != NULL) {
-                if(send_sig_info(SIGNEW, &info, target_process) < 0) {
-                        printk(KERN_INFO "Unable to send signal\n");
-                }
-        }*/
+	mutex_unlock(&dev->ctl_lock);	
 
 	return 0;
 }
